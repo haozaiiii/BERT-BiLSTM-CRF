@@ -1,0 +1,23 @@
+nohup ./run.py -batch_size=16 -num_train_epochs=4 -learning_rate=5e-5 -do_lower_case=False -max_seq_length=510 -dropout_rate=0.0 -do_train=True -do_eval=False -output_dir=/home/panyinghao/project/git/BERT-BiLSTM-CRF-NER/out/16_5e5 > ./log/out16_5e5_case.log &
+nohup ./run.py -batch_size=16 > ./log/out16_5e5_uncase50%.log &
+nohup ./run.py -batch_size=16
+
+##server
+nohup ./run.py -bert_model_dir=/home/panyinghao/server/BERT-BiLSTM-CRF-NER/uncased_L-12_H-768_A-12 -model_dir=/home/panyinghao/server/BERT-BiLSTM-CRF-NER/output > ./log/server.log &
+
+/home/panyinghao/project/git/BERT-BiLSTM-CRF-NER/uncased_L-12_H-768_A-12/
+######## train ########
+1)# lstm 1 epoch
+nohup ./run.py -batch_size=16 -num_train_epochs=1 -output_dir=/home/panyinghao/project/git/modelout/model_epoch1/ > /home/panyinghao/project/git/log/model_epoch1.log &
+
+2)# lstm 1 epoch no wordpiece
+修改了bert_lstm_ner 222 行
+（a）#停用wordPiece
+token = tokenizer.tokenize_No_wordpiece(word)
+（b）tokenization增加了tokenize_No_wordpiece(word)方法
+nohup ./run.py -batch_size=16 -num_train_epochs=1 -output_dir=/home/panyinghao/project/git/modelout/model_epoch1_no_wordpiece2/ > /home/panyinghao/project/git/log/model_epoch1_no_wordpiece2.log &
+
+3) lstm3层
+nohup ./run.py -batch_size=16 -num_train_epochs=1 -num_layers=1 -output_dir=/home/panyinghao/project/git/modelout/model_epoch1_no_wordpiece_lstm3/ > /home/panyinghao/project/git/log/model_epoch1_no_wordpiece_lstm3.log &
+
+

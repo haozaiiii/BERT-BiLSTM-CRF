@@ -1,0 +1,16 @@
+1.修改labels
+bert_lstm_ner.py    def get_labels(self, labels=None)
+
+2.追加lstm层
+models.py   create_model
+rst = blstm_crf.add_blstm_crf_layer(crf_only=False)##使用lstm+crf
+rst = blstm_crf.add_blstm_crf_layer(crf_only=True)##仅使用crf
+
+3.修改mask
+bert_lstm_ner def convert_single_example
+#停用wordPiece
+token = tokenizer.tokenize_No_wordpiece(word)
+
+4.训练
+#50W
+nohup ./run.py -num_train_epochs=10 -output_dir=/home/pyh/project/git/ck/commoa_10epoch > ./log/comma_epoch.log &
