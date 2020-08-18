@@ -405,6 +405,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                  modeling.get_assignment_map_from_checkpoint(tvars,
                                                              init_checkpoint)
             tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
+            # tf.train.get_checkpoint_state
 
         # 打印变量名
         # logger.info("**** Trainable Variables ****")
@@ -551,8 +552,10 @@ def train(args):
     run_config = tf.estimator.RunConfig(
         model_dir=args.output_dir,
         save_summary_steps=500,
-        save_checkpoints_steps=500,
-        log_step_count_steps=1,
+        save_checkpoints_steps=1000,
+        log_step_count_steps=100,
+        # keep_checkpoint_max=None,
+        # keep_checkpoint_every_n_hours=1,
         session_config=session_config
     )
 
