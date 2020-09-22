@@ -15,7 +15,9 @@ from __future__ import print_function
 import collections
 import os
 import numpy as np
+np.random.seed(1)
 import tensorflow as tf
+tf.set_random_seed(2)
 import codecs
 import pickle
 
@@ -420,7 +422,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
         output_spec = None
         if mode == tf.estimator.ModeKeys.TRAIN:
-            #train_op = optimizer.optimizer(total_loss, learning_rate, num_train_steps)
+            # train_op = optimizer.optimizer(total_loss, learning_rate, num_train_steps)
             train_op = optimization.create_optimizer(
                  total_loss, learning_rate, num_train_steps, num_warmup_steps, False)
             hook_dict = {}

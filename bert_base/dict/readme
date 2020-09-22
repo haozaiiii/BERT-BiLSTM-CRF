@@ -1,0 +1,6 @@
+dict.txt: 词 出现次数 词性
+dict_feqsort.txt： 对dict.txt根据出现次数做了排序
+feq_word_count.txt： 长度为2的词的出现次数
+hanzi.feq： 单个汉字的出现次数
+pinyin.txt： 单词汉字的拼音
+shape_sim_data.txt： 单个汉字形相似的字

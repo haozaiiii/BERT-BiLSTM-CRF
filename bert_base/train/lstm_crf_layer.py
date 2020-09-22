@@ -100,6 +100,7 @@ class BLSTM_CRF(object):
     def blstm_layer(self, embedding_chars):
         """
 
+
         :return:
         """
         with tf.variable_scope('rnn_layer'):

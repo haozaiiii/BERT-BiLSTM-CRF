@@ -66,7 +66,7 @@ def get_args_parser():
                              'E.g., 0.1 = 10% of training.')
     group2.add_argument('-lstm_size', type=int, default=128,
                         help='size of lstm units.')
-    group2.add_argument('-num_layers', type=int, default=3,
+    group2.add_argument('-num_layers', type=int, default=1,
                         help='number of rnn layers, default is 1.')
     group2.add_argument('-cell', type=str, default='lstm',
                         help='which rnn cell used.')
@@ -80,7 +80,7 @@ def get_args_parser():
     group2.add_argument('-do_lower_case', type=bool, default=True,
                         help='Whether to lower case the input text.')
     group2.add_argument('-clean', type=bool, default=True)
-    group2.add_argument('-device_map', type=str, default='0',
+    group2.add_argument('-device_map', type=str, default='0,1',
                         help='witch device using to train')
 
     # add labels
