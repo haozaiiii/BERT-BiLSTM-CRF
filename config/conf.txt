@@ -1,0 +1,23 @@
+[LINUX]
+use_gpu = true
+zi_dict_path = /home/panyinghao/project/BERT-BiLSTM-CRF/bert_base/dict/pinyin.txt
+ci_dict_path = /home/panyinghao/project/BERT-BiLSTM-CRF/bert_base/dict/dict.txt
+ngram_model_path = /home/panyinghao/model/leveldb/py_level_db3
+model_dir = /home/panyinghao/model/checkpoints/xianshang/100w10p
+bert_dir = /home/panyinghao/model/bert_model/chinese_L-12_H-768_A-12
+ngram_suggest_url = http://localhost:8045/ngram_suggests_service
+
+[WIN]
+use_gpu = false
+zi_dict_path = ./../dict/pinyin.txt
+ci_dict_path = ./../dict/dict.txt
+ngram_model_path = D:\work\bert_ner\leveldb_model\win_bigram_leveldb_tmp
+model_dir = D:\workspace\gitdownload\BERT-BiLSTM-CRF-NER\output
+bert_dir = D:\workspace\gitdownload\BERT-BiLSTM-CRF-NER\uncased_L-12_H-768_A-12
+ngram_suggest_url = http://localhost:8045/ngram_suggests_service
+
+[cpu]
+cpu_num = 0
+intra_op_parallelism_threads = 0
+inter_op_parallelism_threads = 0
+
