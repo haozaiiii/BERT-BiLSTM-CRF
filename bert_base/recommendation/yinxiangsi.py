@@ -1,4 +1,3 @@
-from bert_base.recommendation.DictObject import DictObject, remove_num
 from pypinyin import pinyin, lazy_pinyin, Style
 import jieba
 import numpy as np
@@ -19,11 +18,27 @@ import sys
 #
 #
 # db = plyvel.DB(ngram_model_path)
-global db
+# global db
+from bert_base.recommendation.DictObject import DictObject, remove_num
+from bert_base.recommendation.get_post_url import post_url
 
 dict_obj = DictObject()
 
+global fastPredict
+global get_ngram_score_url
+global get_ppl_score_url
+global ngram_top_n
+global ppl_word
 
+import json
+import requests
+import string
+
+punc = string.punctuation
+punctuation = '“”！@#￥%……&*（），。、【】{}：《》？/|'
+
+headers = {'Content-Type': 'application/json',
+       }
 
 def sigmoid_derivative(x):
     '''sigmoid'''
@@ -58,20 +73,36 @@ def yin_zi_find_pre_after_word(sentence ,replace_index):
 
     return pre_word_str, after_word_str
 
+# def get_call_ngram(word_str,ngram_db):
 def get_call_ngram(word_str):
-    global db
     '''
     从ngram中获取字符串出现次数
     '''
     if len(word_str)<1:
         return 0
-    feq = db.get(word_str.encode('utf-8'),0)
-    if feq != 0:
-        feq = int(feq.decode('utf-8'))
+    # feq = db.get(word_str.encode('utf-8'),0)
+    feq = post_url(get_ngram_score_url,word_str)
+    # if feq != 0:
+    #     feq = int(feq.decode('utf-8'))
 
     return feq
 
-def yin_zi_call(sentence ,replace_index):
+def get_call_ngram_http(word_str,ngram_db):
+    db = ngram_db
+    '''
+    从ngram中获取字符串出现次数
+    '''
+    if len(word_str)<1:
+        return 0
+    feq = db.get(word_str[0].encode('utf-8'),0)
+    # if type(feq) == bytes:
+    #     feq = feq.decode('utf-8')
+    if feq != 0:
+        feq = int(feq.decode('utf-8'))
+    # feq = post_url(get_ngram_score_url,word_str)
+    return feq
+
+def yin_zi_call_ngram(sentence ,replace_index):
     '''
     sentence:替换字后句子
     replace_index:替换字索引
@@ -83,10 +114,10 @@ def yin_zi_call(sentence ,replace_index):
     pre_word_str, after_word_str = yin_zi_find_pre_after_word(sentence ,replace_index)
     #向前字符串词频 + sigmoid
     pre_word_str_feq = get_call_ngram(pre_word_str)
-    pre_word_str_feq = sigmoid_derivative(pre_word_str_feq/1000.0)
+    # pre_word_str_feq = sigmoid_derivative(pre_word_str_feq/1000.0)
     #向后字符串词频 + sigmoid
     after_word_str_feq = get_call_ngram(after_word_str)
-    after_word_str_feq = sigmoid_derivative(after_word_str_feq/1000.0)
+    # after_word_str_feq = sigmoid_derivative(after_word_str_feq/1000.0)
 
 
 
@@ -94,6 +125,237 @@ def yin_zi_call(sentence ,replace_index):
     # print('前缀串','ngram词频','后缀串','ngram词频',' : ',pre_word_str+'|',str(pre_word_str_feq)+'|',after_word_str+'|',str(after_word_str_feq)+'|')
 
     return call
+
+def yin_zi_call_ppl(sentence ,replace_index):
+
+    # 计算ppl的索引位置
+    index_set = set()
+    for index in replace_index:
+        i=1
+        while (index-i)>0 and i<ppl_word:
+            if sentence[index-i] in punc or sentence[index-i] in punctuation:
+                break
+            else:
+                index_set.add(index-i)
+                i+=1
+        index_set.add(index)
+        j=1
+        while (index+j)<len(sentence) and j<ppl_word:
+            if sentence[index+j] in punc or sentence[index+j] in punctuation:
+                break
+            else:
+                index_set.add(index+j)
+                j+=1
+    index_list = list(index_set)
+    sen_dict = {'text':sentence,'index_list':index_list}
+    response = requests.post(get_ppl_score_url, data=json.dumps(sen_dict), headers=headers)
+    score = float(json.loads(response.content)['data']['score'])
+    if score is not None:
+        return score
+    else:
+        return -1
+
+    # try:
+    #     score = fastPredict.predict_index(sentence, replace_index)
+    #
+    # #     # return 1/score
+    #     return score
+    # except Exception as e:
+    #     print(e)
+    # #     print('ppl except, not score: ',str(score),' || sentence :',sentence)
+    #     sys.stdout.flush()
+    #     return -1
+
+def yin_zi_call_ppl_estimator(sentence ,replace_index):
+
+    # 计算ppl的索引位置
+    index_set = set()
+    for index in replace_index:
+        i=1
+        while (index-i)>0 and i<ppl_word:
+            if sentence[index-i] in punc or sentence[index-i] in punctuation:
+                break
+            else:
+                index_set.add(index-i)
+                i+=1
+        index_set.add(index)
+        j=1
+        while (index+j)<len(sentence) and j<ppl_word:
+            if sentence[index+j] in punc or sentence[index+j] in punctuation:
+                break
+            else:
+                index_set.add(index+j)
+                j+=1
+    index_list = list(index_set)
+    # sen_dict = {'text':sentence,'index_list':index_list}
+    # response = requests.post(get_ppl_score_url, data=json.dumps(sen_dict), headers=headers)
+    # score = float(json.loads(response.content)['data']['score'])
+    # if score is not None:
+    #     return score
+    # else:
+    #     return -1
+
+    try:
+        score = fastPredict.predict_index(sentence, index_list)
+
+    #     # return 1/score
+        return score
+    except Exception as e:
+        print(e)
+    #     print('ppl except, not score: ',str(score),' || sentence :',sentence)
+        sys.stdout.flush()
+        return -1
+
+
+
+def yin_zi_call(sentence ,replace_index,flag):
+    if flag == 'ngram':
+        call = yin_zi_call_ngram(sentence ,replace_index)
+    elif flag == 'ppl':
+        # call = yin_zi_call_ppl(sentence ,replace_index)
+        call = yin_zi_call_ppl_estimator(sentence ,replace_index)
+    return call
+
+def yin_zi_call_post(predict_dict_list,flag):
+    # if flag == 'ngram':
+    #     call = yin_zi_call_ngram(sentence ,replace_index)
+    if flag == 'ppl':
+        url = get_ppl_score_url
+        headers = {'Content-Type': 'application/json',
+                   }
+        data = {'predict_dict_list': predict_dict_list}
+        response = requests.post(url, data=json.dumps(data), headers=headers, timeout=2)
+        call = json.loads(response.content)['predict_score']
+
+    return call
+
+def get_ppl_count_start_end():
+    pass
+def get_sim_word_call(sim_zi_list, sentence, item,token_zi):
+    sim_zi_call_dict_ngram = {}
+    # ngram 粗排，取top10
+    for zi in sim_zi_list:
+        replace_sen = sentence[0:item['start']] + zi + sentence[item['end']:]
+        sim_zi_call_dict_ngram[zi] = yin_zi_call(replace_sen, item['start'],'ngram')
+
+    sim_zi_call_sort_ngram = sorted(sim_zi_call_dict_ngram.items(), key=lambda x: x[1], reverse=True)
+
+    lens = len(sim_zi_call_sort_ngram) if len(sim_zi_call_sort_ngram)<int(ngram_top_n) else int(ngram_top_n)
+
+    print('ngram打分：', sim_zi_call_sort_ngram)
+    sys.stdout.flush()
+
+        # ppl细排，取top1
+    sim_zi_call_dict_ppl = {}
+    for i in range(lens):
+        k,v = sim_zi_call_sort_ngram[i]
+        replace_sen = sentence[0:item['start']] + k + sentence[item['end']:]
+        # print('替换句：')
+        # print(replace_sen)
+        # sim_zi_call_dict_ppl[k] = yin_zi_call(replace_sen, item['start'], 'ppl')
+        replace_index = [j for j in range(item['start'],item['end'])]
+        sim_zi_call_dict_ppl[k] = yin_zi_call(replace_sen, replace_index, 'ppl')
+
+    # 原文计算ppl：
+    if token_zi not in sim_zi_call_dict_ppl:
+        replace_sen = sentence[0:item['start']] + token_zi + sentence[item['end']:]
+        # sim_zi_call_dict_ppl[token_zi] = yin_zi_call(replace_sen, item['start'], 'ppl')
+        replace_index = [j for j in range(item['start'], item['end'])]
+        # replace_index = get_ppl_count_start_end()
+        sim_zi_call_dict_ppl[token_zi] = yin_zi_call(replace_sen, replace_index, 'ppl')
+        # print(token_zi,sim_zi_call_dict_ppl.get(token_zi,-1))
+
+    # sim_zi_call_sort_ppl = sorted(sim_zi_call_dict_ppl.items(), key=lambda x: x[1], reverse=True)
+    sim_zi_call_sort_ppl = sorted(sim_zi_call_dict_ppl.items(), key=lambda x: x[1])
+    print('ppl打分',sim_zi_call_sort_ppl)
+    sys.stdout.flush()
+
+
+
+    return sim_zi_call_sort_ppl,sim_zi_call_dict_ppl
+
+
+def get_sim_word_call_post_url(sim_zi_list, sentence, item, token_zi):
+    sim_zi_call_dict_ngram = {}
+    # ngram 粗排，取top10
+    for zi in sim_zi_list:
+        replace_sen = sentence[0:item['start']] + zi + sentence[item['end']:]
+        sim_zi_call_dict_ngram[zi] = yin_zi_call(replace_sen, item['start'], 'ngram')
+
+    sim_zi_call_sort_ngram = sorted(sim_zi_call_dict_ngram.items(), key=lambda x: x[1], reverse=True)
+
+    lens = len(sim_zi_call_sort_ngram) if len(sim_zi_call_sort_ngram) < int(ngram_top_n) else int(ngram_top_n)
+
+    print('ngram打分：', sim_zi_call_sort_ngram)
+    sys.stdout.flush()
+
+    post_dict = {}
+
+    # ppl细排，取top1
+    predict_dict_list = []
+    tmp_rep_word_set = set()
+    for i in range(lens):
+        k, v = sim_zi_call_sort_ngram[i]
+        replace_sen = sentence[0:item['start']] + k + sentence[item['end']:]
+        # print('替换句：')
+        # print(replace_sen)
+        # sim_zi_call_dict_ppl[k] = yin_zi_call(replace_sen, item['start'], 'ppl')
+        replace_index = [j for j in range(item['start'], item['end'])]
+        pre_predict_dict = {'replace_sen':replace_sen,'replace_index':replace_index,'replcace_word':k}
+        predict_dict_list.append(pre_predict_dict)
+        tmp_rep_word_set.add(k)
+
+
+    # 原文计算ppl：
+    if token_zi not in tmp_rep_word_set:
+        replace_sen = sentence[0:item['start']] + token_zi + sentence[item['end']:]
+        replace_index = [j for j in range(item['start'], item['end'])]
+        pre_predict_dict = {'replace_sen': replace_sen, 'replace_index': replace_index, 'replcace_word': token_zi}
+        predict_dict_list.append(pre_predict_dict)
+        tmp_rep_word_set.add(token_zi)
+
+    sim_zi_call_dict_ppl = yin_zi_call_post(predict_dict_list, 'ppl')
+
+
+    # sim_zi_call_sort_ppl = sorted(sim_zi_call_dict_ppl.items(), key=lambda x: x[1], reverse=True)
+    sim_zi_call_sort_ppl = sorted(sim_zi_call_dict_ppl.items(), key=lambda x: x[1])
+    print('ppl打分', sim_zi_call_sort_ppl)
+    sys.stdout.flush()
+
+    return sim_zi_call_sort_ppl, sim_zi_call_dict_ppl
+
+def filter_houxuanci_one_word(sim_zi_call_sort,sim_zi_call_dict):
+    '''
+    主要根据ppl，去除ppl最低的返回
+    '''
+    return [sim_zi_call_sort[0][0]]
+
+def filter_houxuanci_three_word(sim_zi_call_sort,sim_zi_call_dict):
+    '''
+    按排序找到前三个候选词返回，前三个中出现词频差距较大的则删除三个中较后面的
+    ***主要根据ngram计算出的词频
+    '''
+    ret_list = []
+    if len(sim_zi_call_sort) > 0:
+        ret_i = 0
+        for word in sim_zi_call_sort:
+            # 词频小于1的不要
+            if ret_i < 3 and sim_zi_call_dict.get(word[0],0) > 0:
+                ret_list.append(word[0])
+                ret_i += 1
+
+    if len(ret_list) > 1:
+    # if len(ret_list) > 1 and sim_zi_call_dict[ret_list[0]] != 0:
+        # for word in ret_list:
+        #     if sim_zi_call_dict[word] == 0:
+        #         ret_list.remove(word)
+
+        for i in range(1, len(ret_list)):
+            if sim_zi_call_dict[ret_list[i]] * 1000 < sim_zi_call_dict[ret_list[i - 1]]:
+                ret_list = ret_list[0:i]
+                break
+
+    return ret_list
 
 def yin_zi_ngram(sentence, item):
     '''
@@ -111,41 +373,26 @@ def yin_zi_ngram(sentence, item):
     yin_list = remove_num(yin_list)
 
 
-    # 2.根据音找到该音的所有字
+    # 2.1根据音找到该音的所有字
     sim_zi_list = []
     for yin in yin_list:
         sim_zi_list += dict_obj.yin_zi_dict.get(yin,[])
-    # 移除原文元素
-    if token_zi in sim_zi_list:
-        sim_zi_list.remove(token_zi)
 
-    # 移除原文元素
-    if token_zi in sim_zi_list:
-        sim_zi_list.remove(token_zi)
+    # 2.2 根据音找到相似音所有的字
+    sim_zi_list = list(set(sim_zi_list) | dict_obj.sim_yin_zi_dict.get(token_zi,{}))
+
+    # 添加原文元素
+    if token_zi not in sim_zi_list:
+        # sim_zi_list.remove(token_zi)
+        sim_zi_list.add(token_zi)
 
     # print('音相似字候选集',sim_zi_list)
 
     # 3.打分
-    sim_zi_call_dict = {}
-    for zi in sim_zi_list:
-        replace_sen = sentence[0:item['start']]+zi+sentence[item['end']:]
-        sim_zi_call_dict[zi] = yin_zi_call(replace_sen,item['start'])
+    sim_zi_call_sort,sim_zi_call_dict = get_sim_word_call(sim_zi_list, sentence, item,token_zi)
 
-    sim_zi_call_sort = sorted(sim_zi_call_dict.items(),key=lambda x:x[1],reverse=True)
-    # print('替换词打分：',sim_zi_call_sort)
-    # return sim_zi_call_sort[0][0]
-
-    ret_list = []
-    if len(sim_zi_call_sort)>0:
-        ret_i = 0
-        for word in sim_zi_call_sort:
-            if ret_i<2:
-                ret_list.append(word[0])
-                ret_i += 1
-
-
-    return ret_list
-
+    # return filter_houxuanci_three_word(sim_zi_call_sort,sim_zi_call_dict)
+    return filter_houxuanci_one_word(sim_zi_call_sort,sim_zi_call_dict)
 
 def yin_ci_ngram(sentence, item):
     token_zi = item['token']
@@ -159,38 +406,37 @@ def yin_ci_ngram(sentence, item):
     yin_str = '_'.join(yin_list)
 
     #2.找到拼音下所有的词语
-    sim_zi_list = dict_obj.yin_ci_dict.get(yin_str,[])
-    #移除原文元素
-    if token_zi in sim_zi_list:
-        sim_zi_list.remove(token_zi)
+    sim_zi_list = dict_obj.yin_ci_dict.get(yin_str,set())
+
+    # 移除原文元素
+    # if token_zi not in sim_zi_list:
+        # sim_zi_list.remove(token_zi)
+        # sim_zi_list.add(token_zi)
 
     # print('音相似词候选集', sim_zi_list)
 
     # 3.打分
-    sim_zi_call_dict = {}
-    for zi in sim_zi_list:
-        replace_sen = sentence[0:item['start']]+zi+sentence[item['end']:]
-        sim_zi_call_dict[zi] = yin_zi_call(replace_sen,item['start'])
+    sim_zi_call_sort,sim_zi_call_dict = get_sim_word_call(sim_zi_list, sentence, item,token_zi)
 
-    sim_zi_call_sort = sorted(sim_zi_call_dict.items(), key=lambda x: x[1], reverse=True)
-    # print('替换词打分：',sim_zi_call_sort)
-    # return sim_zi_call_sort[0][0]
-    ret_list = []
-    if len(sim_zi_call_sort)>0:
-        ret_i = 0
-        for word in sim_zi_call_sort:
-            if ret_i<2:
-                ret_list.append(word[0])
-                ret_i += 1
-
-
-    return ret_list
+    # return filter_houxuanci(sim_zi_call_sort,sim_zi_call_dict)
+    return filter_houxuanci_one_word(sim_zi_call_sort,sim_zi_call_dict)
 
 
 
-def yinxiangsi(sentence, item, leveldb):
-    global db
-    db = leveldb
+def yinxiangsi(sentence, item, ngram_score_url, ppl_score_url, top_n,ppl_word_n):
+# def yinxiangsi(sentence, item, ppl_model, ngram_score_url, top_n,ppl_word_n):
+    global fastPredict
+    global get_ngram_score_url
+    global ngram_top_n
+    global get_ppl_score_url
+    global ppl_word
+
+    # fastPredict = ppl_model
+    get_ngram_score_url = ngram_score_url
+    ngram_top_n = int(top_n)
+    get_ppl_score_url = ppl_score_url
+    ppl_word = int(ppl_word_n)
+
 
     '''
     分发：字错误  词错误
@@ -211,10 +457,10 @@ def test():
     print(pinyin('重心'))
     print(jieba.lcut('粤海化工辩称，对于原告当庭增加诉讼请求不要求新的答辩期限和举证期限。'))
     print(jieba.lcut('粤海化工辨城，对于原告当庭增加诉讼请求不要球新的答辩期限和举证期限。'))
-    feq = db.get('的表现'.encode('utf-8'),0)
-    if feq != 0:
-        feq = feq.decode('utf-8')
-    print(feq)
+    # feq = db.get('的表现'.encode('utf-8'),0)
+    # if feq != 0:
+    #     feq = feq.decode('utf-8')
+    # print(feq)
 
 
 def zi_test():

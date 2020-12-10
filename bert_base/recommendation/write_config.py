@@ -35,5 +35,5 @@ config['cpu'] = {
 
 }
 
-with open(r'./../dict/conf.ini','w') as file:
+with open(r'../../config/conf.ini', 'w') as file:
     config.write(file)

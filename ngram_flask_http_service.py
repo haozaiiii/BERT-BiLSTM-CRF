@@ -30,7 +30,7 @@ import plyvel
 app = flask.Flask(__name__)
 
 # CONFIG_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+r'/dict/conf.ini'
-CONFIG_PATH = os.path.dirname(os.path.abspath(__file__))+r'/bert_base/dict/conf.ini'
+CONFIG_PATH = os.path.dirname(os.path.abspath(__file__))+r'/config/conf.ini'
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
 
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     if os.name == 'nt':
         app.run(host='0.0.0.0', port=8045)
     else:
-        app.run(host='0.0.0.0', port=8045, processes=True)
-        # app.run(processes=True)
+        # app.run(host='0.0.0.0', port=8045, processes=True)
+        app.run(processes=True)
     # online_predict()
 

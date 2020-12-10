@@ -569,6 +569,7 @@ def train(args):
     if args.do_train and args.do_eval:
         # 加载训练数据
         train_examples = processor.get_train_examples(args.data_dir)
+        print(len(train_examples))
         num_train_steps = int(
             len(train_examples) *1.0 / args.batch_size * args.num_train_epochs)
         if num_train_steps < 1:

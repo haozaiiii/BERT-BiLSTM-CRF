@@ -4,7 +4,8 @@ from pypinyin import pinyin, lazy_pinyin, Style
 import configparser
 
 
-CONFIG_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+r'/dict/conf.ini'
+CONFIG_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+r'/conf/conf.ini'
+# CONFIG_PATH = r'/home/panyinghao/project/BERT-BiLSTM-CRF/bert_base/dict/conf.ini'
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
 if os.name == 'nt':
@@ -17,6 +18,7 @@ else:
     # ci_dict_path = r'/home/panyinghao/project/BERT-BiLSTM-CRF/bert_base/dict/dict.txt'
     zi_dict_path = config['LINUX']['zi_dict_path']
     ci_dict_path = config['LINUX']['ci_dict_path']
+    sim_zi_dict_path = config['LINUX']['sim_zi_dict_path']
 
 
 def remove_num(yin_element):
@@ -39,8 +41,11 @@ class DictObject:
         # zi_yin_dict : key是汉字 value 是拼音set()
         # yin_ci_dict : key是拼音 value 是汉字词语set()
         # ci_feq_cixing_dict ： key是词语 value是词频_词性list
+        # sim_yin_zi_dict:key是某个汉字，val是音相似的set()
+
         self.yin_zi_dict, self.zi_yin_dict = self.get_yin_zi_dict()
         self.yin_ci_dict, self.ci_feq_cixing_dict = self.get_yin_ci_dict()
+        self.sim_yin_zi_dict = self.get_sim_yin_zi_dict()
 
     def get_yin_zi_dict(self):
         yin_zi_dict = {}
@@ -63,7 +68,25 @@ class DictObject:
                         yin_zi_dict.get(pyin).add(zi)
                         zi_yin_dict.get(zi).add(pyin)
 
+
+
         return yin_zi_dict, zi_yin_dict
+
+    def get_sim_yin_zi_dict(self):
+        sim_zi_dict = {}
+        with open(sim_zi_dict_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            word_list = content.replace('\r', '').split('\n')
+            for element in word_list:
+                if  len(element)>2 and len(element.split(' ')) == 2:
+                    key = element.split(' ')[0]
+                    value_set = set(element.split(' ')[1])
+                    sim_zi_dict[key] = value_set
+
+        return sim_zi_dict
+
+
+
 
     def get_yin_ci_dict(self):
         yin_ci_dict = {}

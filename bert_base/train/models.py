@@ -89,9 +89,15 @@ def create_model(bert_config, is_training, input_ids, input_mask,
         use_one_hot_embeddings=use_one_hot_embeddings
     )
     # 获取对应的embedding 输入数据[batch_size, seq_length, embedding_size]
+    # embedding Tensor("bert/encoder/Reshape_13:0", shape=(56, 202, 768), dtype=float32)
     embedding = model.get_sequence_output()
+    # max_seq_length 202
     max_seq_length = embedding.shape[1].value
     # 算序列真实长度
+    # input_ids Tensor("IteratorGetNext:0", shape=(56, 202), dtype=int32)
+    # tf.abs Tensor("Abs_1:0", shape=(56, 202), dtype=int32)
+    # used Tensor("Sign:0", shape=(56, 202), dtype=int32)
+    # lengths Tensor("Sum:0", shape=(56,), dtype=int32)  1行56列（/56行1列？）的数组   每个batch下序列的真实长度
     used = tf.sign(tf.abs(input_ids))
     lengths = tf.reduce_sum(used, reduction_indices=1)  # [batch_size] 大小的向量，包含了当前batch中的序列长度
     # 添加CRF output layer

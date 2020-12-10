@@ -53,8 +53,10 @@ class BLSTM_CRF(object):
             logits = self.project_crf_layer(self.embedded_chars)
         else:
             # blstm
+            # lstm_output Tensor("rnn_layer/concat:0", shape=(56, 202, 256), dtype=float32)
             lstm_output = self.blstm_layer(self.embedded_chars)
             # project
+            # logits Tensor("project/Reshape:0", shape=(56, 202, 7), dtype=float32)
             logits = self.project_bilstm_layer(lstm_output)
         # crf
         loss, trans = self.crf_layer(logits)
@@ -114,6 +116,10 @@ class BLSTM_CRF(object):
 
             outputs, _ = tf.nn.bidirectional_dynamic_rnn(cell_fw, cell_bw, embedding_chars,
                                                          dtype=tf.float32)
+            # _
+            # output_states为(output_state_fw, output_state_bw)，包含了前向和后向最后的隐藏状态的组成的二元组。
+            # output_state_fw和output_state_bw的类型为LSTMStateTuple。
+            # LSTMStateTuple由（c，h）组成，分别代表memory cell和hidden state
             outputs = tf.concat(outputs, axis=2)
         return outputs
 

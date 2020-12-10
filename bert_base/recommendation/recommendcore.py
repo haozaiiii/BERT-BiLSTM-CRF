@@ -1,7 +1,10 @@
+# from recommendation.yinxiangsi import yinxiangsi
 from bert_base.recommendation.yinxiangsi import yinxiangsi
 
+def get_suggest_word(element,get_ngram_score_url, get_ppl_score_url, ngram_top_n,ppl_word_n):
 
-def get_suggest_word(element,db):
+
+# def get_suggest_word(element, fastPredict, get_ngram_score_url, ngram_top_n, ppl_word_n):
     '''
     element:
     {
@@ -19,12 +22,22 @@ def get_suggest_word(element,db):
     '''
     sentence = element['sentence']
     items = element['items']
+    ret_items = []
     for item in items:
         if item['errType'] == 0:
-            suggest_word = yinxiangsi(sentence, item,db)
-            item['suggest_word'] = suggest_word if suggest_word is not None else ''
+            suggest_word = yinxiangsi(sentence, item,get_ngram_score_url, get_ppl_score_url, ngram_top_n,ppl_word_n)
+            # suggest_word = yinxiangsi(sentence, item, fastPredict, get_ngram_score_url, ngram_top_n,ppl_word_n)
+            item['suggest_word'] = [suggest_word[0] if suggest_word is not None else ['']]
         else:
-            return None
+            item['suggest_word'] = ['']
+            # return None
+            # pass
+        if item['suggest_word'][0] == item['token']:
+            # continue
+            item['suggest_word'] = ['']
+        ret_items.append(item)
+
+    element['items'] = ret_items
 
     return element
 

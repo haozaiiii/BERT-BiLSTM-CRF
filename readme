@@ -1,3 +1,5 @@
+#多进程
+/home/panyinghao/anaconda3/envs/tf13/bin/gunicorn -w 2 -b 0.0.0.0:8055 -k gevent gunciton_run:app
 1.修改labels
 bert_lstm_ner.py    def get_labels(self, labels=None)
 
@@ -12,5 +14,27 @@ bert_lstm_ner def convert_single_example
 token = tokenizer.tokenize_No_wordpiece(word)
 
 4.训练
-#50W
-nohup ./run.py -num_train_epochs=10 -output_dir=/home/pyh/project/git/ck/commoa_10epoch > ./log/comma_epoch.log &
+#70 动词1500limit
+nohup ./run.py -num_train_epochs=2 -num_layers=1 -device_map=0 -output_dir=/home/appmanager/fc/enck/dongci_stf > ./log/dongci_stf.log &
+nohup ./run.py -num_train_epochs=2 -num_layers=1 -device_map=0 -output_dir=/home/appmanager/fc/enck/dongci_stf_500limit > ./log/dongci_stf_500limit.log &
+
+
+#57 动词nonelimit
+nohup ./run.py -num_train_epochs=2 -num_layers=1 -output_dir=/home/panyinghao/project/git/modelout/dongci_stf_nolimit > ./log/dongci_stf_nolimit.log &
+
+
+5.测试
+#57 stf
+./run.py -num_train_epochs=2 -num_layers=1 -do_train -do_eval -output_dir=/home/panyinghao/project/git/modelout/dongci_stf_13w
+
+6.服务器
+
+
+###中文###
+##训练
+nohup ./run.py -num_train_epochs=7 -num_layers=1 -device_map=1 -output_dir=/home/appmanager/fc/ck/zh_7ep_1lay >./log/zh_7ep_1lay.log &
+nohup ./run.py -num_train_epochs=2 -num_layers=1 -device_map=1 -output_dir=/home/appmanager/fc/ck/zh_2ep_1lay >./log/zh_2ep_1lay.log &
+nohup ./run.py -num_train_epochs=2 -num_layers=1 -output_dir=/home/panyinghao/project/ck/zh_2ep_1lay_* > ./log/zh_2ep_1lay_*.log &
+
+##测试
+./run.py -num_train_epochs=2 -num_layers=1 -do_train -do_eval -device_map=2 -output_dir=/home/appmanager/fc/ck/zh_2ep_1lay

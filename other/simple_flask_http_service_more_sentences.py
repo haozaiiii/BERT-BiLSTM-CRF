@@ -6,12 +6,11 @@
 # @Author  : MaCan (ma_cancan@163.com)
 # @File    : ${NAME}.py
 """
-# /home/panyinghao/anaconda3/envs/tf13/bin/gunicorn -w 2 -b 0.0.0.0:8055 -k gevent gunciton_run:app
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import requests
 import os
 import flask
 from flask import request, jsonify
@@ -21,82 +20,35 @@ from datetime import datetime
 import tensorflow as tf
 from tensorflow import keras as K
 import numpy as np
-from flask import make_response
-from werkzeug.contrib.fixers import ProxyFix
 
 import sys
-
-# from bert_base.recommendation.recommendcore import get_suggest_word
-
 sys.path.append('../..')
 from bert_base.train.models import create_model, InputFeatures
 from bert_base.bert import tokenization, modeling
-import re
-import configparser
 
-app = flask.Flask(__name__)
-
-CONFIG_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+r'/dict/conf.ini'
-config = configparser.ConfigParser()
-config.read(CONFIG_PATH)
-
-gpu_config = tf.ConfigProto()
-gpu_config.gpu_options.allow_growth = True
 
 if os.name == 'nt':
-    # model_dir = r'D:\workspace\gitdownload\BERT-BiLSTM-CRF-NER\output'
-    # bert_dir = r'D:\workspace\gitdownload\BERT-BiLSTM-CRF-NER\uncased_L-12_H-768_A-12'
-    bert_dir = config['WIN']['bert_dir']
-    model_dir = config['WIN']['model_dir']
-    ngram_suggest_url = config['WIN']['ngram_suggest_url']
-
-    if str(config['WIN']['use_gpu']).lower() == 'true':
-        os.environ['CUDA_VISIBLE_DEVICES'] = config['gpu']['CUDA_VISIBLE_DEVICES']
-    else:
-        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-        gpu_config.device_count = {"CPU": config['cpu']['cpu_num']}
-        gpu_config.intra_op_parallelism_threads = config['cpu']['intra_op_parallelism_threads']
-        gpu_config.inter_op_parallelism_threads = config['cpu']['inter_op_parallelism_threads']
+    model_dir = r'/output'
+    bert_dir = r'/uncased_L-12_H-768_A-12'
 else:
+    # model_dir = r'/home/panyinghao/project/git/BERT-CRF-NER/output'
+    # bert_dir = r'/home/panyinghao/project/git/BERT-CRF-NER/uncased_L-12_H-768_A-12'
+    # model_dir = r'/home/panyinghao/server/BERT-BiLSTM-CRF-NER/output20200703'
+    model_dir = r'/home/panyinghao/project/git/BERT-BiLSTM-CRF-NER/model_epoch1_no_wordpiece'
+    bert_dir = r'/home/panyinghao/project/git/BERT-BiLSTM-CRF-NER/uncased_L-12_H-768_A-12_no_wordpiece/'
 
-    bert_dir = config['LINUX']['bert_dir']
-    model_dir = config['LINUX']['model_dir']
-    ngram_suggest_url = config['LINUX']['ngram_suggest_url']
 
-    if str(config['LINUX']['use_gpu']).lower() == 'true':
-        # os.environ['CUDA_VISIBLE_DEVICES'] = config['gpu']['CUDA_VISIBLE_DEVICES']
-        os.environ['CUDA_VISIBLE_DEVICES'] = 0
-    else:
-        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-        gpu_config.device_count = {"CPU": config['cpu']['cpu_num']}
-        gpu_config.intra_op_parallelism_threads = config['cpu']['intra_op_parallelism_threads']
-        gpu_config.inter_op_parallelism_threads = config['cpu']['inter_op_parallelism_threads']
+
 
 is_training=False
 use_one_hot_embeddings=False
 batch_size=1
 max_seq_length = 202
 
-
-
-'''
-gpu_config.inter_op_parallelism_threads 一般设置为2
-'''
-
-#cpu_num = int(os.environ.get('CPU_NUM', 1))
-os.environ['CUDA_VISIBLE_DEVICES']='0'
 gpu_config = tf.ConfigProto()
 gpu_config.gpu_options.allow_growth = True
-#gpu_config.device_count={"CPU": cpu_num}
-#gpu_config.intra_op_parallelism_threads = cpu_num
-#gpu_config.inter_op_parallelism_threads = 2
-
-
-
 sess=tf.Session(config=gpu_config)
 model=None
-yingshe_dict = {"B-yinxiangsi":0,"B-xingxiangsi":1,"B-duozi":2,"B-diandao":3,"B-shaozi":4}
-yingshe_ch_dict = {"B-yinxiangsi": '音相似', "B-xingxiangsi": '形相似', "B-duozi": '多字', "B-diandao": '颠倒', "B-shaozi": '少字'}
 
 global graph
 input_ids_p, input_mask_p, label_ids_p, segment_ids_p = None, None, None, None
@@ -126,7 +78,7 @@ with graph.as_default():
     bert_config = modeling.BertConfig.from_json_file(os.path.join(bert_dir, 'bert_config.json'))
     (total_loss, logits, trans, pred_ids) = create_model(
         bert_config=bert_config, is_training=False, input_ids=input_ids_p, input_mask=input_mask_p, segment_ids=None,
-        labels=None, num_labels=num_labels, use_one_hot_embeddings=False, dropout_rate=1.0,num_layers=1,lstm_size=128)
+        labels=None, num_labels=num_labels, use_one_hot_embeddings=False, dropout_rate=0.5,num_layers=1,lstm_size=128)
 
     saver = tf.train.Saver()
     saver.restore(sess, tf.train.latest_checkpoint(model_dir))
@@ -134,8 +86,11 @@ with graph.as_default():
 tokenizer = tokenization.FullTokenizer(
         vocab_file=os.path.join(bert_dir, 'vocab.txt'), do_lower_case=True)
 
-@app.route('/ner_predicts_service', methods=['POST'])
-def ner_predicts_service():
+app = flask.Flask(__name__)
+
+
+@app.route('/ner_predict_service', methods=['GET'])
+def ner_predict_service():
     """
     do online prediction. each time make prediction for one instance.
     you can change to a batch if you want.
@@ -154,54 +109,112 @@ def ner_predicts_service():
     global graph
     with graph.as_default():
         result = {}
+        result['code'] = 0
         try:
-            ret_dict = {}
-            ret_list = []
-            total = 0
-            sentences = list(request.json['sentences'])
-            for sentence in sentences:
-                sen_dict = {}
-                pre_sen = sentence
+            sententces = list(request.json['text'])
+            for s in sententces:
+                print(s)
 
-                sentence = re.sub('[0-9]','*',sentence)
 
-                if len(sentence) < 2:
-                    err_index_end_list = []
-                else:
-                    sentence = tokenizer.tokenize_No_wordpiece(sentence)
-                    input_ids, input_mask, segment_ids, label_ids = convert(sentence)
-                    feed_dict = {input_ids_p: input_ids,
-                                 input_mask_p: input_mask}
-                    # run session get current feed_dict result
-                    pred_ids_result = sess.run([pred_ids], feed_dict)
-                    pred_label_result = convert_id_to_label(pred_ids_result, id2label)
-                    print('原文 : ',str(pre_sen).lower())
-                    print('token : ',sentence)
-                    print('tag : ',pred_label_result[0])
-                    sys.stdout.flush()
-                    err_index_end_list = find_index_int_token_tag(str(pre_sen).lower(), sentence, pred_label_result[0])
+            return
+            sentence = request.args['query']
+            result['query'] = sentence
+            start = datetime.now()
+            if len(sentence) < 2:
+                print(sentence)
+                result['data'] = ['O'] * len(sentence)
+                return json.dumps(result)
+            sentence = tokenizer.tokenize(sentence)
+            # print('your input is:{}'.format(sentence))
+            input_ids, input_mask, segment_ids, label_ids = convert(sentence)
+            # print('#####################')
+            # print('input_ids : ',input_ids)
+            # print('input_mask : ',input_mask)
+            # print('#####################')
 
-                sen_dict['sentence'] = pre_sen
-                sen_dict['items'] = err_index_end_list
-                sen_dict = get_suggest_word_http_request(sen_dict)
-                total += len(err_index_end_list)
-                ret_list.append(sen_dict)
-            ret_dict['total'] = total
-            ret_dict['result'] = ret_list
-            ret_dict['code'] = 0
-            rst = make_response(json.dumps(ret_dict))
-            return rst, 200, {'Content-Type': 'application/json'}
 
-           # return json.dumps(ret_dict)
+            feed_dict = {input_ids_p: input_ids,
+                         input_mask_p: input_mask}
+            # run session get current feed_dict result
+            pred_ids_result = sess.run([pred_ids], feed_dict)
+            pred_label_result = convert_id_to_label(pred_ids_result, id2label)
+            print(pred_label_result)
+            #todo: 组合策略
+            result['data'] = pred_label_result
+            print('#####################')
+            print('input_ids : '+str(input_ids))
+            print('input_mask : '+str(input_mask))
+            print('#####################')
+            print('time used: {} sec'.format((datetime.now() - start).total_seconds()))
+            return json.dumps(result)
         except:
             result['code'] = -1
-            result['data'] = 'special character in content'
-            result['result'] = []
+            result['data'] = 'error'
+            return json.dumps(result)
 
-        return json.dumps(result)
+@app.route('/ner_predicts_service_pre', methods=['POST'])
+def ner_predicts_service_pre():
+    """
+    do online prediction. each time make prediction for one instance.
+    you can change to a batch if you want.
 
-@app.route('/ner_predicts_service_mutisen', methods=['POST'])
-def ner_predicts_service_mutisen():
+    :param line: a list. element is: [dummy_label,text_a,text_b]
+    :return:
+    """
+    def convert(line):
+        feature = convert_single_example(0, line, label_list, max_seq_length, tokenizer, 'p')
+        input_ids = np.reshape([feature.input_ids],(batch_size, max_seq_length))
+        input_mask = np.reshape([feature.input_mask],(batch_size, max_seq_length))
+        segment_ids = np.reshape([feature.segment_ids],(batch_size, max_seq_length))
+        label_ids =np.reshape([feature.label_ids],(batch_size, max_seq_length))
+        return input_ids, input_mask, segment_ids, label_ids
+
+    global graph
+    with graph.as_default():
+        result = {}
+        result['code'] = 0
+        try:
+
+            sentences = request.args['query']
+            result['query'] = sentences
+            start = datetime.now()
+            tag_data = []
+            for sentence in str(sentences).split('&&'):
+                query_data = {}
+                print('sentence',sentence)
+                query_data['query'] = sentence
+                if len(sentence) < 2:
+                    query_data['tag'] = ['O'] * len(sentence)
+                    tag_data.append(query_data)
+
+                sentence = tokenizer.tokenize(sentence)
+
+                # print('your input is:{}'.format(sentence))
+                input_ids, input_mask, segment_ids, label_ids = convert(sentence)
+
+
+                feed_dict = {input_ids_p: input_ids,
+                             input_mask_p: input_mask}
+                # run session get current feed_dict result
+                pred_ids_result = sess.run([pred_ids], feed_dict)
+                pred_label_result = convert_id_to_label(pred_ids_result, id2label)
+                print(pred_label_result)
+                sentence, pred_label_result = mergeList(sentence,pred_label_result[0])
+                query_data['tokens'] = sentence
+                query_data['tags'] = pred_label_result
+                #todo: 组合策略
+                print(query_data)
+                tag_data.append(query_data)
+            result['data'] = tag_data
+            print('time used: {} sec'.format((datetime.now() - start).total_seconds()))
+            find_index_int_token_tag(result['query'],result['tokens'],result['tags'])
+            return json.dumps(result)
+        except:
+            result['code'] = -1
+            result['data'] = 'error'
+            return json.dumps(result)
+@app.route('/ner_predicts_service', methods=['POST'])
+def ner_predicts_service():
 
     """
     do online prediction. each time make prediction for one instance.
@@ -227,13 +240,9 @@ def ner_predicts_service_mutisen():
             ret_list = []
             total = 0
             sentences = list(request.json['sentences'])
-            sentences = cut_sentences(sentences[0])
-
             for sentence in sentences:
                 sen_dict = {}
                 pre_sen = sentence
-
-                sentence = re.sub('[0-9]', '*', sentence)
 
                 if len(sentence) < 2:
                     err_index_end_list = []
@@ -245,75 +254,69 @@ def ner_predicts_service_mutisen():
                     # run session get current feed_dict result
                     pred_ids_result = sess.run([pred_ids], feed_dict)
                     pred_label_result = convert_id_to_label(pred_ids_result, id2label)
-                    print(str(pre_sen).lower())
-                    print(sentence)
-                    print(pred_label_result[0])
+                    print('原句小写：',str(pre_sen).lower(), flush=True)
+                    print('分词：',sentence, flush=True)
+                    print('标签：',pred_label_result[0], flush=True)
                     sys.stdout.flush()
                     err_index_end_list = find_index_int_token_tag(str(pre_sen).lower(), sentence, pred_label_result[0])
 
                 sen_dict['sentence'] = pre_sen
                 sen_dict['items'] = err_index_end_list
-                sen_dict = get_suggest_word_http_request(sen_dict)
                 total += len(err_index_end_list)
                 ret_list.append(sen_dict)
             ret_dict['total'] = total
             ret_dict['result'] = ret_list
-            ret_dict['code'] = 0
-            rst = make_response(json.dumps(ret_dict))
-            return rst, 200, {'Content-Type': 'application/json'}
 
-           # return json.dumps(ret_dict)
+            return json.dumps(ret_dict)
         except:
             result['code'] = -1
-            result['data'] = 'special character in content'
-            result['result'] = []
+            result['data'] = 'error'
+            return json.dumps(result)
 
-        return json.dumps(result)
+def mergeword(retList):
+    length = len(retList)
+    for i in range(length-1):
+        if retList[i]['end'] == retList[i+1]['start']:
+            retList[i]['end'] = retList[i+1]['end']
+            retList[i]['token'] = retList[i]['token']+retList[i+1]['token']
+            del retList[i+1]
+            return mergeword(retList)
+    return retList
 
-
-def get_suggest_word_http_request(sen_dict):
-    headers = {'Content-Type': 'application/json',
-               }
-    response = requests.post(ngram_suggest_url, data=json.dumps(sen_dict), headers=headers)
-    return json.loads(response.content)
-def find_index_int_token_tag_method2(query, tokens, tags):
+def find_index_int_token_tag(query,tokens,tags):
     retList = []
     index = 0
     tokenM = ''
-    for token, tag in zip(tokens, tags):
-        if len(tag) == 1 and 'O' in tag:
+    for token, tag in zip(tokens,tags):
+        if len(tag) == 0 and 'O' in tag:
             if len(tokenM) > 0:
                 start = query.index(tokenM, index, len(query))
                 end = start + len(tokenM)
                 token_tag = {}
                 token_tag['start'] = start
                 token_tag['end'] = end
-                token_tag['errType'] = yingshe_dict.get(tags[start], tags[start])
-                token_tag['errType_ch'] = yingshe_ch_dict.get(tags[start], tags[start])
-                token_tag['errType_en'] = tags[start]
+                token_tag['errType'] = 0
                 token_tag['token'] = query[start:end]
                 retList.append(token_tag)
                 index = end
-                tokenM = ''
             else:
                 index = index + len(token)
         elif 'I-' in tag:
-            tokenM += token
+                tokenM +=token
         elif 'B-' in tag:
-            if len(tokenM) > 0:
+            if len(tokenM)>0:
                 start = query.index(tokenM, index, len(query))
                 end = start + len(tokenM)
                 token_tag = {}
                 token_tag['start'] = start
                 token_tag['end'] = end
-                token_tag['errType'] = yingshe_dict.get(tags[start], tags[start])
-                token_tag['errType_ch'] = yingshe_ch_dict.get(tags[start], tags[start])
-                token_tag['errType_en'] = tags[start]
+                token_tag['errType'] = 0
                 token_tag['token'] = query[start:end]
                 retList.append(token_tag)
                 index = end
 
             tokenM = token
+
 
     if len(tokenM) > 0:
         start = query.index(tokenM, index, len(query))
@@ -321,27 +324,14 @@ def find_index_int_token_tag_method2(query, tokens, tags):
         token_tag = {}
         token_tag['start'] = start
         token_tag['end'] = end
-        token_tag['errType'] = yingshe_dict.get(tags[start], tags[start])
-        token_tag['errType_ch'] = yingshe_ch_dict.get(tags[start], tags[start])
+        token_tag['errType'] = 0
         token_tag['token'] = query[start:end]
         retList.append(token_tag)
         index = end
 
-    return retList
+    return  retList
 
-def mergeword(retList):
-    length = len(retList)
-    for i in range(length-1):
-        if retList[i]['end'] == retList[i+1]['start'] and 'I-' in retList[i+1]['errType_en']:
-            retList[i]['end'] = retList[i+1]['end']
-            retList[i]['token'] = retList[i]['token']+retList[i+1]['token']
-            del retList[i+1]
-            return mergeword(retList)
-    for i in range(length):
-        del retList[i]['errType_en']
-    return retList
-
-def find_index_int_token_tag(query,tokens,tags):
+def find_index_int_token_tag_pre(query,tokens,tags):
     retList = []
     index = 0
     for token, tag in zip(tokens,tags):
@@ -351,15 +341,14 @@ def find_index_int_token_tag(query,tokens,tags):
             token_tag = {}
             token_tag['start'] = start
             token_tag['end'] = end
-            token_tag['errType_en'] = tag
-            token_tag['errType'] = yingshe_dict.get(tag, tag)
-            token_tag['errType_ch'] = yingshe_ch_dict.get(tag, tag)
+            token_tag['errType'] = 0
             token_tag['token'] = query[start:end]
             retList.append(token_tag)
 
             index = end
         else:
             index = index + len(token)
+
     retList = mergeword(retList)
     return  retList
 
@@ -402,6 +391,10 @@ def online_predict():
         print(pred_label_result)
 
         print('time used: {} sec'.format((datetime.now() - start).total_seconds()))
+
+
+
+
 
 def convert_id_to_label(pred_ids_result, idx2label):
     """
@@ -525,38 +518,14 @@ def mergeList(sentence, pred_label_result):
 
     return new_sentence, new_pred_label_result
 
-def cut_sentences(content):
-    # 结束符号，包含中文和英文的
-    end_flag = ['?', '!', '.', '？', '！', '。', '…']
 
-    content_len = len(content)
-    sentences = []
-    tmp_char = ''
-    for idx, char in enumerate(content):
-        # 拼接字符
-        tmp_char += char
-
-        # 判断是否已经到了最后一位
-        if (idx + 1) == content_len:
-            sentences.append(tmp_char)
-            break
-
-        # 判断此字符是否为结束符号
-        if char in end_flag:
-            # 再判断下一个字符是否为结束符号，如果不是结束符号，则切分句子
-            next_idx = idx + 1
-            if not content[next_idx] in end_flag:
-                sentences.append(tmp_char)
-                tmp_char = ''
-
-    return sentences
 
 if __name__ == "__main__":
-    app.wsgi_app = ProxyFix(app.wsgi_app)
     if os.name == 'nt':
         app.run(host='0.0.0.0', port=12345)
     else:
-        #app.run(host='0.0.0.0', port=8055, processes=True)
-        app.run(processes=True)
+        app.run(host='0.0.0.0', port=8055)
     # online_predict()
+
+
 
